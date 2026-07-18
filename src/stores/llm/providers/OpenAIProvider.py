@@ -8,14 +8,14 @@ class OpenAIProvider(LLMInterface):
     def __init__(self, api_key: str, api_url: str = None, 
                        default_input_max_characters: int=1000,
                        default_generation_max_output_tokens: int=1000,
-                       default_generation_temprature: float=0.1):
+                       default_generation_temperature: float=0.1):
         
         self.api_key = api_key
         self.api_url = api_url
         
         self.default_input_max_characters = default_input_max_characters
         self.default_generation_max_output_tokens = default_generation_max_output_tokens
-        self.default_generation_temprature = default_generation_temprature
+        self.default_generation_temperature = default_generation_temperature
         
         self.generation_model_id = None
         
@@ -24,10 +24,12 @@ class OpenAIProvider(LLMInterface):
         
         self.client = OpenAI(
             api_key = self.api_key,
-            api_url = self.api_url
+            base_url = self.api_url if self.api_url and len(self.api_url) else None
         )
 
-        self.logger = logging.getlogger(__name__)
+        self.enums = OpenAIEnums
+
+        self.logger = logging.getLogger(__name__)
 
     def set_generation_model(self, model_id: str):        
         self.generation_model_id = model_id
@@ -51,7 +53,7 @@ class OpenAIProvider(LLMInterface):
             return None
 
         max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
-        temprature = temprature if temprature else self.default_generation_temprature
+        temperature = temprature if temprature else self.default_generation_temperature
         
         chat_history.append(
             self.construct_prompt(prompt=prompt, role=OpenAIEnums.USER.value)
@@ -61,14 +63,14 @@ class OpenAIProvider(LLMInterface):
             model = self.generation_model_id,
             messages = chat_history,
             max_tokens = max_output_tokens,
-            temprature = temprature
+            temperature = temperature
         )
         
         if not response or not response.choices or len(response.choices) == 0 or not response.choices[0].message:
             self.logger.error("Error while generating text with OpenAI")
             return None
         
-        return response.choices[0].message["content"]
+        return response.choices[0].message.content
         
     
     def embed_text(self, text: str, document_type: str = None):
@@ -86,7 +88,7 @@ class OpenAIProvider(LLMInterface):
             input = text
         )
         
-        if not response or response.data or len(response.data) == 0 or not response.data[0].embedding:
+        if not response or not response.data or len(response.data) == 0 or not response.data[0].embedding:
             self.logger.error("Error while embedding text with OpenAI")
             return None
         
